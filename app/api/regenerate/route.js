@@ -10,20 +10,25 @@ export async function POST(req) {
   try {
     const { leadId } = await req.json();
 
-    const { data: lead } = await supabase
+    if (!leadId) {
+      return Response.json({ error: 'leadId is required' }, { status: 400 });
+    }
+
+    const { data: lead, error: leadError } = await supabase
       .from('discovered_leads')
       .select('*, website_reports(*)')
       .eq('id', leadId)
       .single();
 
-    if (!lead) {
+    if (leadError || !lead) {
       return Response.json({ error: 'Lead not found' }, { status: 404 });
     }
 
     const report = lead.website_reports?.[0]?.report_json || null;
+
     const message = await generateOutreachMessage(lead, report);
 
-    const { error } = await supabase
+    const { error: insertError } = await supabase
       .from('outreach_messages')
       .insert({
         lead_id: leadId,
@@ -32,13 +37,14 @@ export async function POST(req) {
         status: 'draft'
       });
 
-    if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+    if (insertError) {
+      return Response.json({ error: insertError.message }, { status: 500 });
     }
 
     return Response.json({ ok: true, message });
 
   } catch (error) {
+    console.error('Regenerate error:', error);
     return Response.json({ error: error.message }, { status: 500 });
   }
 }
