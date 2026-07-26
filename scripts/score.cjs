@@ -10,9 +10,14 @@ const supabase = createClient(
 function computeScore(lead, report) {
   let score = 0;
 
+  // NO WEBSITE = HIGHEST OPPORTUNITY (100 points)
   if (!lead.website || lead.website_status === 'confirmed_no_website') {
-    score += 50;
-  } else if (report) {
+    score = 100;
+    return score;
+  } 
+  
+  // HAS WEBSITE - check quality
+  if (report) {
     if (report.reachable) score += 20;
     else score += 35;
     if (report.hasSSL) score += 20;

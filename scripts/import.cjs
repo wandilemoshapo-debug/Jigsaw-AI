@@ -9,107 +9,216 @@ const supabase = createClient(
 );
 
 const CSV_PATH = process.argv[2] || './leads.csv';
+const CAMPAIGN_ID = process.argv[3] || null;
 
-// Intelligent column mapping
-const COLUMN_MAP = {
-  business_name: ['business name', 'name', 'company', 'business', 'organisation'],
-  address: ['address', 'street address', 'location', 'full address'],
-  phone: ['phone', 'phone number', 'tel', 'telephone', 'contact number', 'cell'],
-  industry_category: ['category', 'industry', 'type', 'sector'],
-  website: ['website', 'website url', 'url', 'web'],
-  email: ['email', 'email address', 'e-mail'],
-  suburb: ['suburb', 'city', 'town', 'area'],
-  province: ['province', 'state', 'region'],
-  brabys_url: ['more information', 'brabys url', 'profile link', 'more info', 'brabys link']
-};
-
-function findColumn(headers, aliases) {
-  const lower = headers.map(h => h.trim().toLowerCase());
-  for (const alias of aliases) {
-    const idx = lower.indexOf(alias);
-    if (idx !== -1) return headers[idx];
+// ✅ UPDATED: Special mapping for Brabys CSV format
+function parseBrabysRecord(row) {
+  // Extract business name (text-lg column)
+  const businessName = row['text-lg']?.trim() || '';
+  
+  // Extract address (pt-2 column)
+  const address = row['pt-2']?.trim() || '';
+  
+  // Extract category (text-black column)
+  const category = row['text-black']?.trim() || '';
+  
+  // Extract phone (contactItem column)
+  const phone = row['contactItem']?.trim() || '';
+  
+  // Extract email (contactItem 2 column)
+  const email = row['contactItem 2']?.trim() || '';
+  
+  // Extract Brabys URL (text-lg href column)
+  const brabysUrl = row['text-lg href']?.trim() || '';
+  
+  // Extract website (text-white href column - may contain a website or Brabys link)
+  let website = row['text-white href']?.trim() || '';
+  // If the website is a Brabys link, it's not a real website
+  if (website && website.includes('brabys.com')) {
+    website = null;
   }
-  // Try partial matches
-  for (const alias of aliases) {
-    for (let i = 0; i < lower.length; i++) {
-      if (lower[i].includes(alias) || alias.includes(lower[i])) {
-        return headers[i];
+  
+  // Try to find a real website from the "Visit Website" link
+  // Sometimes it's in the 'text-white href' column
+  if (!website) {
+    // Check if there's a "Visit Website" link
+    const visitWebsite = row['text-white']?.trim() || '';
+    if (visitWebsite && visitWebsite.includes('Visit Website')) {
+      const websiteLink = row['text-white href']?.trim() || '';
+      if (websiteLink && !websiteLink.includes('brabys.com')) {
+        website = websiteLink;
       }
     }
   }
-  return null;
+
+  // Extract suburb from address
+  let suburb = '';
+  let province = '';
+  if (address) {
+    const parts = address.split(',').map(p => p.trim());
+    if (parts.length >= 2) {
+      suburb = parts[parts.length - 2] || '';
+      province = parts[parts.length - 1] || '';
+    } else if (parts.length === 1) {
+      suburb = parts[0];
+    }
+  }
+
+  // Determine website status
+  let websiteStatus;
+  if (website) {
+    websiteStatus = 'has_website';
+  } else if (brabysUrl) {
+    websiteStatus = 'unknown';
+  } else {
+    websiteStatus = 'confirmed_no_website';
+  }
+
+  return {
+    business_name: businessName || 'Unknown Business',
+    address: address || null,
+    phone: phone || null,
+    email: email || null,
+    website: website || null,
+    brabys_url: brabysUrl || null,
+    category: category || null,
+    suburb: suburb || null,
+    province: province || null,
+    website_status: websiteStatus
+  };
 }
 
 async function run() {
   console.log(`📂 Reading CSV from: ${CSV_PATH}`);
   
+  if (!fs.existsSync(CSV_PATH)) {
+    console.log(`❌ File not found: ${CSV_PATH}`);
+    console.log('💡 Usage: node scripts/import.cjs ./your-file.csv [campaign_id]');
+    return;
+  }
+
+  // Check if campaign exists
+  if (CAMPAIGN_ID) {
+    const { data: campaign, error } = await supabase
+      .from('campaigns')
+      .select('id, name, is_archived')
+      .eq('id', CAMPAIGN_ID)
+      .single();
+    
+    if (error || !campaign) {
+      console.log(`❌ Campaign with ID ${CAMPAIGN_ID} not found`);
+      return;
+    }
+    
+    if (campaign.is_archived || campaign.status === 'archived') {
+      console.log(`❌ Campaign "${campaign.name}" is archived and read-only`);
+      return;
+    }
+    
+    console.log(`📌 Importing into campaign: ${campaign.name} (ID: ${campaign.id})`);
+  } else {
+    console.log('⚠️ No campaign specified. Leads will be imported without a campaign.');
+  }
+  
   const file = fs.readFileSync(CSV_PATH, 'utf8');
   const parsed = Papa.parse(file, { header: true, skipEmptyLines: true });
-  const headers = parsed.meta.fields;
+  const records = parsed.data;
 
-  // Detect columns
-  const resolved = {};
-  for (const field in COLUMN_MAP) {
-    resolved[field] = findColumn(headers, COLUMN_MAP[field]);
+  if (!records || records.length === 0) {
+    console.log('❌ No records found in CSV');
+    return;
   }
-  console.log('📋 Detected columns:', resolved);
+
+  console.log(`📊 Found ${records.length} records`);
 
   let imported = 0;
   let skipped = 0;
+  let updated = 0;
 
-  for (const row of parsed.data) {
-    const name = resolved.business_name ? row[resolved.business_name]?.trim() : null;
-    if (!name) {
+  for (const row of records) {
+    // Skip empty rows
+    const hasContent = Object.values(row).some(val => val && val.trim());
+    if (!hasContent) {
       skipped++;
       continue;
     }
 
-    const website = resolved.website ? (row[resolved.website]?.trim() || null) : null;
-    const brabysUrl = resolved.brabys_url ? (row[resolved.brabys_url]?.trim() || null) : null;
-    const suburb = resolved.suburb ? row[resolved.suburb]?.trim() : null;
-    const province = resolved.province ? row[resolved.province]?.trim() : null;
-
-    // Determine website status
-    let websiteStatus;
-    if (website) {
-      websiteStatus = 'has_website';
-    } else if (brabysUrl) {
-      websiteStatus = 'unknown'; // Need to check Brabys page
-    } else {
-      websiteStatus = 'confirmed_no_website';
+    // Parse the Brabys record
+    const biz = parseBrabysRecord(row);
+    
+    if (!biz.business_name || biz.business_name === 'Unknown Business') {
+      skipped++;
+      continue;
     }
 
-    const { error } = await supabase
+    // Check if business already exists
+    const { data: existing } = await supabase
       .from('discovered_leads')
-      .upsert({
-        business_name: name,
-        address: resolved.address ? row[resolved.address]?.trim() : null,
-        phone: resolved.phone ? row[resolved.phone]?.trim() : null,
-        email: resolved.email ? row[resolved.email]?.trim() : null,
-        industry_category: resolved.industry_category ? row[resolved.industry_category]?.trim() : null,
-        suburb: suburb,
-        province: province,
-        website: website,
-        brabys_url: brabysUrl,
-        website_status: websiteStatus,
-        discovery_sources: ['csv_import']
-      }, {
-        onConflict: 'business_name'
-      });
+      .select('id, campaign_id')
+      .eq('business_name', biz.business_name)
+      .maybeSingle();
 
-    if (error) {
-      console.log(`❌ Error importing ${name}:`, error.message);
-      skipped++;
+    const leadData = {
+      business_name: biz.business_name,
+      address: biz.address,
+      phone: biz.phone,
+      email: biz.email,
+      website: biz.website,
+      brabys_url: biz.brabys_url,
+      industry_category: biz.category,
+      suburb: biz.suburb,
+      province: biz.province,
+      website_status: biz.website_status,
+      campaign_id: CAMPAIGN_ID || null,
+      discovery_sources: ['brabys_csv_import'],
+      updated_at: new Date().toISOString()
+    };
+
+    if (existing) {
+      // Update existing lead
+      const { error } = await supabase
+        .from('discovered_leads')
+        .update({
+          ...leadData,
+          campaign_id: CAMPAIGN_ID || existing.campaign_id
+        })
+        .eq('id', existing.id);
+
+      if (error) {
+        console.log(`❌ Error updating ${biz.business_name}:`, error.message);
+        skipped++;
+      } else {
+        updated++;
+        console.log(`🔄 Updated: ${biz.business_name}`);
+      }
     } else {
-      imported++;
-      console.log(`✅ Imported: ${name} (${websiteStatus})`);
+      // Insert new lead
+      const { error } = await supabase
+        .from('discovered_leads')
+        .insert({
+          ...leadData,
+          created_at: new Date().toISOString()
+        });
+
+      if (error) {
+        console.log(`❌ Error importing ${biz.business_name}:`, error.message);
+        skipped++;
+      } else {
+        imported++;
+        console.log(`✅ Imported: ${biz.business_name}`);
+        if (biz.website) console.log(`   🌐 Website: ${biz.website}`);
+        if (biz.phone) console.log(`   📞 Phone: ${biz.phone}`);
+        if (biz.email) console.log(`   ✉️ Email: ${biz.email}`);
+      }
     }
   }
 
   console.log(`\n🎉 Import complete!`);
   console.log(`📊 Imported: ${imported}`);
+  console.log(`🔄 Updated: ${updated}`);
   console.log(`⏭️ Skipped: ${skipped}`);
-  console.log(`📋 Total records: ${parsed.data.length}`);
+  console.log(`📋 Total records: ${records.length}`);
+  console.log(`📁 Campaign ID: ${CAMPAIGN_ID || 'None'}`);
 }
 
 run().catch(console.error);

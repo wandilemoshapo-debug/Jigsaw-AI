@@ -4,8 +4,10 @@ const { chromium } = require('playwright');
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
+
+const CAMPAIGN_ID = process.argv[2] || null;
 
 async function analyzeWebsite(browser, lead) {
   const page = await browser.newPage();
@@ -36,27 +38,21 @@ async function analyzeWebsite(browser, lead) {
     report.hasSSL = lead.website.startsWith('https');
     report.title = await page.title();
 
-    // Check meta description
     const metaDesc = await page.$('meta[name="description"]');
     report.hasMetaDescription = !!metaDesc;
 
-    // Check viewport
     const viewport = await page.$('meta[name="viewport"]');
     report.hasViewport = !!viewport;
 
-    // Count links
     const links = await page.$$('a');
     report.totalLinks = links.length;
 
-    // Check for contact page
     const contactLinks = await page.$$('a[href*="contact"], a[href*="kontak"]');
     report.hasContactPage = contactLinks.length > 0;
 
-    // Check for about page
     const aboutLinks = await page.$$('a[href*="about"], a[href*="oor"]');
     report.hasAboutPage = aboutLinks.length > 0;
 
-    // Check mobile responsiveness
     await page.setViewportSize({ width: 375, height: 812 });
     await page.waitForTimeout(500);
     const mobileContent = await page.content();
@@ -97,11 +93,20 @@ function noWebsiteReport() {
 async function run() {
   console.log('🔍 Starting website analysis...');
 
-  // Get leads with website_status = 'has_website'
-  const { data: leads, error } = await supabase
+  // ✅ FIX: Only get leads from the specified campaign
+  let query = supabase
     .from('discovered_leads')
     .select('*, website_reports(*)')
-    .eq('website_status', 'has_website');
+    .in('website_status', ['has_website', 'confirmed_no_website']);
+
+  if (CAMPAIGN_ID) {
+    console.log(`📌 Analyzing only campaign: ${CAMPAIGN_ID}`);
+    query = query.eq('campaign_id', CAMPAIGN_ID);
+  } else {
+    console.log('📌 Analyzing ALL campaigns (no campaign filter)');
+  }
+
+  const { data: leads, error } = await query;
 
   if (error) {
     console.log('❌ Error fetching leads:', error.message);
@@ -109,19 +114,11 @@ async function run() {
   }
 
   if (!leads || leads.length === 0) {
-    console.log('✅ No leads with websites to analyze!');
+    console.log('✅ No leads to analyze!');
     return;
   }
 
-  // Filter out leads that already have reports
-  const leadsToAnalyze = leads.filter(l => !l.website_reports || l.website_reports.length === 0);
-  
-  if (leadsToAnalyze.length === 0) {
-    console.log('✅ All leads already analyzed!');
-    return;
-  }
-
-  console.log(`📊 Found ${leadsToAnalyze.length} leads to analyze`);
+  console.log(`📊 Found ${leads.length} leads to analyze`);
 
   const browser = await chromium.launch({
     headless: true,
@@ -129,12 +126,20 @@ async function run() {
   });
 
   let analyzed = 0;
-  let failed = 0;
+  let skipped = 0;
 
-  for (const lead of leadsToAnalyze) {
+  for (const lead of leads) {
+    // Skip if already analyzed
+    if (lead.website_reports && lead.website_reports.length > 0) {
+      skipped++;
+      continue;
+    }
+
     console.log(`\n🌐 Analyzing: ${lead.business_name}`);
 
-    const report = await analyzeWebsite(browser, lead);
+    const report = lead.website_status === 'has_website' 
+      ? await analyzeWebsite(browser, lead)
+      : noWebsiteReport();
 
     const { error: insertError } = await supabase
       .from('website_reports')
@@ -145,22 +150,18 @@ async function run() {
       });
 
     if (insertError) {
-      console.log(`❌ Error saving report:`, insertError.message);
-      failed++;
+      console.log(`   ❌ Error saving report:`, insertError.message);
     } else {
       analyzed++;
-      console.log(`✅ Saved report for ${lead.business_name}`);
+      console.log(`   ✅ Saved report`);
     }
-
-    // Small delay between requests
-    await new Promise(r => setTimeout(r, 1000));
   }
 
   await browser.close();
 
   console.log(`\n🎉 Analysis complete!`);
   console.log(`✅ Analyzed: ${analyzed}`);
-  console.log(`❌ Failed: ${failed}`);
+  console.log(`⏭️ Skipped (already analyzed): ${skipped}`);
 }
 
 run().catch(console.error);

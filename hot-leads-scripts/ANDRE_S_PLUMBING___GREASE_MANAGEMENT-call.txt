@@ -1,0 +1,35 @@
+📞 CALL SCRIPT — ANDRE'S PLUMBING & GREASE MANAGEMENT
+
+=== STAGE 1: OPEN THE CALL ===
+
+"Hi, is this ANDRE'S PLUMBING & GREASE MANAGEMENT? My name is Wandile from Jigsaw AI. I came across your business while researching Cell: in Umhlali."
+
+"I'll keep this quick — I noticed you don't have a website yet, which means you're losing customers to competitors online."
+
+"Would it be okay if I WhatsApp you a couple of examples of what I've done for businesses like yours? Takes 2 minutes."
+
+=== GATEKEEPER SCRIPT ===
+
+"Hi, could I speak with the owner or the person who handles the business's marketing?"
+
+=== OBJECTION HANDLING ===
+
+"We're not interested"
+→ "Is it more than you don't need it right now, or not sure the cost is worth it for your business?"
+
+"Send me an email"
+→ "Of course — I'll send you some examples of websites I've built for similar businesses."
+
+=== AFTER THE CALL ===
+
+✅ Send WhatsApp within 15 minutes
+✅ Update lead status to "Proposal Stage"
+✅ Send proposal within 24 hours
+
+🔑 KEY PAIN POINTS:
+• No online presence = customers can't find them
+• Missing credibility = losing to competitors
+• No lead generation = relying only on word of mouth
+• No way for customers to contact them online
+
+🎯 RECOMMENDED: 5-page website with contact form, WhatsApp button, and customer testimonials
