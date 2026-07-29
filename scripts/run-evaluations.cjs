@@ -62,9 +62,9 @@ async function runEvaluations() {
       console.log(`   📱 Digital Presence: ${evaluationResult.total_score}/100 (${evaluationResult.opportunity_level})`);
     }
 
-    if (evaluationResult.opportunity_level === 'Hot') hot++;
-    else if (evaluationResult.opportunity_level === 'Warm') warm++;
-    else if (evaluationResult.opportunity_level === 'Cool') cool++;
+    if (evaluationResult.opportunity_level === '🔥 Hot') hot++;
+    else if (evaluationResult.opportunity_level === '🟠 Warm') warm++;
+    else if (evaluationResult.opportunity_level === '🔵 Cool') cool++;
     else cold++;
 
     const { error: updateError } = await supabase

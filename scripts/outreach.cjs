@@ -56,7 +56,7 @@ async function run() {
 
   for (const lead of leadsToProcess) {
     const report = lead.website_reports?.[0]?.report_json || null;
-    const score = lead.website_reports?.[0]?.opportunity_score || 0;
+    const score = lead.eval_opportunity_score || 0;
     
     console.log(`\n📝 Generating outreach for: ${lead.business_name} (Score: ${score}/100)`);
 
