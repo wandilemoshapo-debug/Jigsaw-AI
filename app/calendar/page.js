@@ -1,5 +1,6 @@
 'use client';
-
+// Add this at the top of the file with other imports
+import { Loader2 } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
