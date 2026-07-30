@@ -3,10 +3,13 @@
   publish = ".next"
 
 [build.environment]
-  NODE_VERSION = "22"  # Changed from 20 to 22
+  NODE_VERSION = "22"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
-  [secretsScan]
-  enabled = false
+[secretsScan]
+  omitKeys = [
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "NEXT_PUBLIC_SUPABASE_URL"
+  ]
