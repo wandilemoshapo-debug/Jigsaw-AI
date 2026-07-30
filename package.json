@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@netlify/plugin-nextjs": "^5.15.13",
     "@supabase/supabase-js": "^2.110.7",
     "@tailwindcss/postcss": "^4.3.3",
     "cheerio": "^1.2.0",
