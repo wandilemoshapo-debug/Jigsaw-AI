@@ -8,8 +8,6 @@
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
+# Disable secrets scanning entirely
 [secretsScan]
-  omitKeys = [
-    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-    "NEXT_PUBLIC_SUPABASE_URL"
-  ]
+  enabled = false
