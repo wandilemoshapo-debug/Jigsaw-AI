@@ -181,7 +181,7 @@ Wandile`
     label: '📞 Call Me',
     content: (businessName) => `📞 CALL BACK SCRIPT
 
-"Hi, this is Wandile from Jigsaw AI returning your call about a website for ${businessName}."
+"Hi, this is Wandile from Jigsaw Studios returning your call about a website for ${businessName}."
 
 "I'm glad you're interested. What questions can I answer for you?"
 
