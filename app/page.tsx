@@ -3,5 +3,3 @@ import { redirect } from 'next/navigation';
 export default function Home() {
   redirect('/campaigns');
 }
-// force update (put comments OUTSIDE the function, not on the same line as the closing brace)
-
