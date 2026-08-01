@@ -190,7 +190,7 @@ export default function ImportsPage() {
               Drag and drop your file here
             </p>
             <p className="text-xs text-slate-500 mt-2">
-              or click "Browse Files" to open your file manager
+or click &quot;Browse Files&quot; to open your file manager
             </p>
           </div>
 

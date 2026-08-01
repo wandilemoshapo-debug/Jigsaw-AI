@@ -291,7 +291,7 @@ export default function CampaignImportPage() {
                   </table>
                 </div>
                 <p className="text-xs text-slate-500 mt-3">
-                  Showing first 5 rows. All leads will be imported to "{campaign.name}".
+Showing first 5 rows. All leads will be imported to &quot;{campaign.name}&quot;.
                 </p>
               </div>
             )}
@@ -305,7 +305,9 @@ export default function CampaignImportPage() {
                     <div className="text-sm text-white">{progress}</div>
                     {pipelineRunning && (
                       <div className="text-xs text-slate-400 mt-1">
-                        This may take a few minutes. You will be redirected automatically.
+                        <ul className="list-disc list-inside">
+<li>📁 You&apos;ll be redirected to the dashboard when complete</li>
+                        </ul>
                       </div>
                     )}
                   </div>
