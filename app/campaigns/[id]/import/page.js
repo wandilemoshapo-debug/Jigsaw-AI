@@ -360,7 +360,7 @@ Showing first 5 rows. All leads will be imported to &quot;{campaign.name}&quot;.
                   <li>🌐 Website analysis runs automatically</li>
                   <li>📊 AI scoring runs automatically</li>
                   <li>📝 Outreach messages generated automatically</li>
-                  <li>📁 You'll be redirected to the dashboard when complete</li>
+<li>📁 You&apos;ll be redirected to the dashboard when complete</li>
                 </ul>
               </div>
             </div>
