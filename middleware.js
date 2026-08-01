@@ -11,7 +11,7 @@ export function middleware(request) {
     return NextResponse.next();
   }
 
-  // Check if user is logged in (checking for your stored variable)
+  // Check if user is logged in
   const isLoggedIn = request.cookies.get('isLoggedIn')?.value === 'true';
 
   if (!isLoggedIn) {
@@ -23,16 +23,8 @@ export function middleware(request) {
   return NextResponse.next();
 }
 
-// Configure which paths the middleware runs on
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
     '/((?!_next/static|_next/image|favicon.ico|public).*)',
   ],
 };

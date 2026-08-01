@@ -10,30 +10,31 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // --- YOUR USER CREDENTIALS ---
+  // User credentials
   const users = {
-    'Jigsaw': { password: '2019@Wandile', redirect: '/campaigns' },
-    'Boom': { password: 'jigsawstudios123', redirect: '/campaigns' },
+    'jigsaw': { password: '2019@Wandile', redirect: '/campaigns' },
+    'boom': { password: 'jigsawstudios123', redirect: '/campaigns' },
   };
-  // -----------------------------
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
-    // Simulate network delay
+    // Simulate a small delay for realism
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const user = users[username.toLowerCase()];
+    const user = users[username.toLowerCase().trim()];
 
     if (user && user.password === password) {
-      // Login successful - SET COOKIE
-      document.cookie = 'isLoggedIn=true; path=/; max-age=86400'; // 24 hours
-      document.cookie = `username=${username}; path=/; max-age=86400`;
-      router.push(user.redirect);
+      // Login successful - set cookies
+      document.cookie = 'isLoggedIn=true; path=/; max-age=86400; SameSite=Lax';
+      document.cookie = `username=${username}; path=/; max-age=86400; SameSite=Lax`;
+      
+      // Redirect to campaigns
+      router.push('/campaigns');
     } else {
-      setError('Invalid username or password');
+      setError('Invalid username or password. Please try again.');
     }
     setLoading(false);
   };
@@ -41,13 +42,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950">
       <div className="w-full max-w-md p-8 bg-slate-900 rounded-xl border border-slate-800 shadow-2xl">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-white">🔐 Jigsaw AI</h1>
           <p className="text-slate-400 mt-2">Sign in to your account</p>
         </div>
 
-        {/* Login Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label htmlFor="username" className="block text-sm font-medium text-slate-300 mb-1">
@@ -61,6 +60,7 @@ export default function LoginPage() {
               className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               placeholder="Enter your username"
               required
+              autoComplete="username"
             />
           </div>
 
@@ -76,6 +76,7 @@ export default function LoginPage() {
               className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
               placeholder="Enter your password"
               required
+              autoComplete="current-password"
             />
           </div>
 
