@@ -1,27 +1,38 @@
 import { NextResponse } from 'next/server';
 
-export function middleware(req) {
-  const { pathname } = req.nextUrl;
+// These paths are allowed without login
+const publicPaths = ['/login', '/api'];
 
-  if (
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/api/login') ||
-    pathname.startsWith('/_next') ||
-    pathname === '/favicon.ico'
-  ) {
+export function middleware(request) {
+  const { pathname } = request.nextUrl;
+
+  // Allow public paths
+  if (publicPaths.some(path => pathname.startsWith(path))) {
     return NextResponse.next();
   }
 
-  const token = req.cookies.get('jigsaw_session')?.value;
-  const validTokens = [process.env.AUTH_JIGSAW_TOKEN, process.env.AUTH_BOOM_TOKEN];
+  // Check if user is logged in (checking for your stored variable)
+  const isLoggedIn = request.cookies.get('isLoggedIn')?.value === 'true';
 
-  if (!token || !validTokens.includes(token)) {
-    return NextResponse.redirect(new URL('/login', req.url));
+  if (!isLoggedIn) {
+    // Redirect to login page
+    const loginUrl = new URL('/login', request.url);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();
 }
 
+// Configure which paths the middleware runs on
 export const config = {
-  matcher: ['/((?!api/login|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+  ],
 };
