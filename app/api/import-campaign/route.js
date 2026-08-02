@@ -80,6 +80,7 @@ export async function POST(req) {
       }
 
       const leadData = {
+        place_id: `csv_${name}_${resolved.suburb ? row[resolved.suburb] : ''}`.toLowerCase().replace(/[^a-z0-9]+/g, '_'),
         business_name: name,
         phone: resolved.phone ? row[resolved.phone]?.trim() : null,
         email: resolved.email ? row[resolved.email]?.trim() : null,
@@ -95,9 +96,8 @@ export async function POST(req) {
       };
 
       const { error } = await supabase
-        .from('discovered_leads')
-        .insert(leadData);
-
+  .from('discovered_leads')
+  .upsert(leadData, { onConflict: 'place_id' });
       if (error) {
         console.error('Error importing:', error);
         skipped++;

@@ -9,7 +9,11 @@ const supabase = createClient(
 
 const CAMPAIGN_ID = process.argv[2] || null;
 
+// This ensures we re-analyze leads even if they have old reports
+const FORCE_REANALYZE = true; // Set to true to override old reports
+
 async function analyzeWebsite(browser, lead) {
+  // ... rest of your analyzeWebsite function stays the same
   const page = await browser.newPage();
   let report = {
     no_website: false,
@@ -130,10 +134,11 @@ async function run() {
 
   for (const lead of leads) {
     // Skip if already analyzed
-    if (lead.website_reports && lead.website_reports.length > 0) {
-      skipped++;
-      continue;
-    }
+   // Skip if already analyzed (unless FORCE_REANALYZE is true)
+if (!FORCE_REANALYZE && lead.website_reports && lead.website_reports.length > 0) {
+  skipped++;
+  continue;
+}
 
     console.log(`\n🌐 Analyzing: ${lead.business_name}`);
 
