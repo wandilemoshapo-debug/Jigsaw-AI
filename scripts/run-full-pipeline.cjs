@@ -11,10 +11,10 @@ async function runFullPipeline() {
   console.log('🚀 STARTING FULL PIPELINE');
   console.log('============================================\n');
 
-  // Step 1: Import CSV
-  console.log('📂 STEP 1: Importing CSV...');
+  // Step 1: Import CSV (using campaign 4)
+  console.log('📂 STEP 1: Importing CSV to Roofing Contractors...');
   try {
-    execSync('node scripts/import.cjs "./brabys (1).csv"', { stdio: 'inherit' });
+    execSync('node scripts/import-with-campaign.cjs "4" "brabys (4).csv"', { stdio: 'inherit' });
   } catch (e) {
     console.log('❌ Import failed, stopping pipeline');
     return;
@@ -63,13 +63,18 @@ async function runFullPipeline() {
   console.log('\n============================================');
   console.log('🎉 FULL PIPELINE COMPLETE!');
   
-  const { data: leads } = await supabase.from('discovered_leads').select('eval_opportunity_level');
+  // Check results for campaign 4
+  const { data: leads } = await supabase
+    .from('discovered_leads')
+    .select('eval_opportunity_level')
+    .eq('campaign_id', '4');
+  
   const counts = (leads || []).reduce((acc, l) => {
     acc[l.eval_opportunity_level] = (acc[l.eval_opportunity_level] || 0) + 1;
     return acc;
   }, {});
   
-  console.log(`\n📊 LEAD SUMMARY:`);
+  console.log(`\n📊 ROOFING CONTRACTORS SUMMARY:`);
   console.log(`🔥 Hot: ${counts['🔥 Hot'] || 0}`);
   console.log(`🟠 Warm: ${counts['🟠 Warm'] || 0}`);
   console.log(`🔵 Cool: ${counts['🔵 Cool'] || 0}`);

@@ -7,13 +7,15 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
 
+console.log('🚀 analyze.cjs started...');
+console.log('📌 Campaign ID:', process.argv[2] || 'ALL');
+
 const CAMPAIGN_ID = process.argv[2] || null;
 
 // This ensures we re-analyze leads even if they have old reports
-const FORCE_REANALYZE = true; // Set to true to override old reports
+const FORCE_REANALYZE = true; // ✅ Set to true to override old reports
 
 async function analyzeWebsite(browser, lead) {
-  // ... rest of your analyzeWebsite function stays the same
   const page = await browser.newPage();
   let report = {
     no_website: false,
@@ -97,11 +99,10 @@ function noWebsiteReport() {
 async function run() {
   console.log('🔍 Starting website analysis...');
 
-  // ✅ FIX: Only get leads from the specified campaign
   let query = supabase
     .from('discovered_leads')
     .select('*, website_reports(*)')
-    .in('website_status', ['has_website', 'confirmed_no_website']);
+    .in('website_status', ['has_website', 'confirmed_no_website', 'needs_review']);
 
   if (CAMPAIGN_ID) {
     console.log(`📌 Analyzing only campaign: ${CAMPAIGN_ID}`);
@@ -133,19 +134,30 @@ async function run() {
   let skipped = 0;
 
   for (const lead of leads) {
-    // Skip if already analyzed
-   // Skip if already analyzed (unless FORCE_REANALYZE is true)
-if (!FORCE_REANALYZE && lead.website_reports && lead.website_reports.length > 0) {
-  skipped++;
-  continue;
-}
-
     console.log(`\n🌐 Analyzing: ${lead.business_name}`);
+    console.log(`   Website: ${lead.website || 'NO WEBSITE'}`);
+    console.log(`   Website Status: ${lead.website_status}`);
+    console.log(`   Has existing report: ${lead.website_reports && lead.website_reports.length > 0}`);
+    console.log(`   FORCE_REANALYZE: ${FORCE_REANALYZE}`);
 
-    const report = lead.website_status === 'has_website' 
-      ? await analyzeWebsite(browser, lead)
-      : noWebsiteReport();
+    // Skip if already analyzed (unless FORCE_REANALYZE is true)
+    if (!FORCE_REANALYZE && lead.website_reports && lead.website_reports.length > 0) {
+      console.log(`   ⏭️ Skipping (already analyzed and FORCE_REANALYZE is false)`);
+      skipped++;
+      continue;
+    }
 
+    // Actually analyze
+    let report;
+    if (lead.website && lead.website_status === 'has_website') {
+      console.log(`   🧪 Running website analysis...`);
+      report = await analyzeWebsite(browser, lead);
+    } else {
+      console.log(`   📝 No website to analyze, creating no-website report`);
+      report = noWebsiteReport();
+    }
+
+    // Save the report
     const { error: insertError } = await supabase
       .from('website_reports')
       .insert({
@@ -159,6 +171,27 @@ if (!FORCE_REANALYZE && lead.website_reports && lead.website_reports.length > 0)
     } else {
       analyzed++;
       console.log(`   ✅ Saved report`);
+      
+      // Update website status based on analysis
+      let status = lead.website_status;
+      if (report.no_website || !lead.website) {
+        status = 'confirmed_no_website';
+      } else if (report.reachable === true) {
+        status = 'has_website';
+      } else if (report.reachable === false) {
+        status = 'needs_review';
+      }
+      
+      const { error: updateError } = await supabase
+        .from('discovered_leads')
+        .update({ website_status: status })
+        .eq('id', lead.id);
+      
+      if (updateError) {
+        console.log(`   ⚠️ Error updating website_status:`, updateError.message);
+      } else {
+        console.log(`   ✅ Updated website_status to: ${status}`);
+      }
     }
   }
 
@@ -166,7 +199,7 @@ if (!FORCE_REANALYZE && lead.website_reports && lead.website_reports.length > 0)
 
   console.log(`\n🎉 Analysis complete!`);
   console.log(`✅ Analyzed: ${analyzed}`);
-  console.log(`⏭️ Skipped (already analyzed): ${skipped}`);
+  console.log(`⏭️ Skipped: ${skipped}`);
 }
 
 run().catch(console.error);

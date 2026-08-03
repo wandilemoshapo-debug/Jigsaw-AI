@@ -4,16 +4,18 @@ const { generateOpportunityExplanation } = require('../lib/ai/index.cjs');
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 );
+
+// Get campaign ID from command line argument
+const CAMPAIGN_ID = process.argv[2] || null;
 
 function computeScore(lead, report) {
   let score = 0;
 
   // NO WEBSITE = HIGHEST OPPORTUNITY (100 points)
   if (!lead.website || lead.website_status === 'confirmed_no_website') {
-    score = 100;
-    return score;
+    return 100;
   } 
   
   // HAS WEBSITE - check quality
@@ -34,13 +36,27 @@ function computeScore(lead, report) {
 }
 
 async function run() {
-  console.log('🤖 Starting AI scoring...');
+  if (CAMPAIGN_ID) {
+    console.log(`🤖 Starting AI scoring for campaign: ${CAMPAIGN_ID}`);
+  } else {
+    console.log('🤖 Starting AI scoring for ALL campaigns...');
+  }
   console.log('📌 Provider order: OpenRouter → Groq → Ollama → Gemini');
 
-  const { data: leads, error } = await supabase
+  // ✅ Build query with optional campaign filter
+  let query = supabase
     .from('discovered_leads')
     .select('*, website_reports(*)')
     .in('website_status', ['has_website', 'confirmed_no_website']);
+
+  if (CAMPAIGN_ID) {
+    console.log(`📌 Filtering to campaign: ${CAMPAIGN_ID}`);
+    query = query.eq('campaign_id', CAMPAIGN_ID);
+  } else {
+    console.log('📌 No campaign filter (ALL leads)');
+  }
+
+  const { data: leads, error } = await query;
 
   if (error) {
     console.log('❌ Error fetching leads:', error.message);
@@ -52,6 +68,7 @@ async function run() {
     return;
   }
 
+  // Filter leads that need scoring (no score yet)
   const leadsToScore = leads.filter(l => 
     l.website_reports?.[0]?.opportunity_score === null || 
     l.website_reports?.[0]?.opportunity_score === undefined
@@ -71,12 +88,16 @@ async function run() {
     const report = lead.website_reports?.[0]?.report_json || null;
     
     console.log(`\n📊 Scoring: ${lead.business_name}`);
+    console.log(`   Website: ${lead.website || 'NO WEBSITE'}`);
+    console.log(`   Website Status: ${lead.website_status}`);
+    console.log(`   Has report: ${!!report}`);
 
     try {
       const score = computeScore(lead, report);
       console.log(`   📊 Calculated score: ${score}/100`);
       
       const explanation = await generateOpportunityExplanation(lead, score);
+      console.log(`   📝 Explanation: ${explanation}`);
 
       const { error: updateError } = await supabase
         .from('website_reports')
@@ -92,7 +113,6 @@ async function run() {
       } else {
         scored++;
         console.log(`✅ ${lead.business_name}: ${score}/100`);
-        console.log(`   📝 ${explanation}`);
       }
     } catch (err) {
       console.log(`❌ Error scoring ${lead.business_name}:`, err.message);
