@@ -1,3 +1,4 @@
+// scripts/import-with-campaign.cjs
 require('dotenv').config({ path: '.env.local' });
 const { createClient } = require('@supabase/supabase-js');
 const fs = require('fs');
@@ -9,7 +10,7 @@ const supabase = createClient(
 );
 
 const CAMPAIGN_ID = process.argv[2] || null;
-const CSV_PATH = process.argv[3] || './brabys (4).csv';
+const CSV_PATH = process.argv[3] || './brabys (7).csv';
 
 async function importCSV() {
   console.log('📂 Importing CSV...');
@@ -46,53 +47,52 @@ async function importCSV() {
   let imported = 0;
   let failed = 0;
   let websitesFound = 0;
-  let brabysUrlsFound = 0;
 
   for (let i = 1; i < records.length; i++) {
     const values = records[i];
 
-    const businessName = values[1] || null;
-    const brabysUrl = values[2] || null;
-    const location = values[3] || null;
-    const industry = values[4] || null;
-    const phone = values[6] || null;
-    const email = values[9] || null;
-    const rawWebsite = values[12] || null;
-    const brabysPage = values[13] || null;
+    // Skip empty rows
+    if (!values || values.length < 5) continue;
+
+    // Map columns based on the CSV structure
+    const businessName = values[1] || null;      // Column 2: Business Name
+    const brabysUrl = values[2] || null;         // Column 3: Brabys URL
+    const location = values[3] || null;          // Column 4: Location
+    const industry = values[6] || null;          // Column 7: Industry
+    const phone = values[8] || null;             // ✅ Column 9: Phone Number
+    const email = values[10] || null;            // ✅ Column 11: Email Address
+
+    // Website detection - check column 12 or 13
+    let website = null;
+    // Check column 12 (index 12) first
+    if (values[12] && values[12].includes('http') && !values[12].includes('brabys.com')) {
+      website = values[12];
+    }
+    // If not found, check column 13 (index 13)
+    if (!website && values[13] && values[13].includes('http') && !values[13].includes('brabys.com')) {
+      website = values[13];
+    }
+
+    if (website) {
+      websitesFound++;
+      website = website.trim();
+      if (!website.startsWith('http://') && !website.startsWith('https://')) {
+        website = 'https://' + website;
+      }
+    }
 
     // Debug first 5 rows
     if (i <= 5) {
       console.log(`\n📋 DEBUG Row ${i}:`);
       console.log(`   Business Name: ${businessName}`);
-      console.log(`   Raw Website: ${rawWebsite}`);
       console.log(`   Phone: ${phone}`);
       console.log(`   Email: ${email}`);
+      console.log(`   Website: ${website || 'NO WEBSITE'}`);
+      console.log(`   Brabys URL: ${brabysUrl}`);
     }
 
     if (!businessName || businessName.trim() === '') {
       continue;
-    }
-
-    // ✅ FIX: Determine if it's a real website or Brabys URL
-    let realWebsite = null;
-    let brabysUrlFinal = brabysUrl || brabysPage || null;
-
-    if (rawWebsite) {
-      const cleaned = rawWebsite.trim();
-      // Check if it's a Brabys URL (contains brabys.com)
-      if (cleaned.includes('brabys.com')) {
-        // It's a Brabys URL, not a real website
-        brabysUrlFinal = brabysUrlFinal || cleaned;
-        console.log(`   ℹ️ ${businessName}: Brabys URL (not a real website)`);
-      } else {
-        // It's a real website
-        realWebsite = cleaned;
-        if (!realWebsite.startsWith('http://') && !realWebsite.startsWith('https://')) {
-          realWebsite = 'https://' + realWebsite;
-        }
-        websitesFound++;
-        console.log(`   ✅ ${businessName}: Real website found: ${realWebsite}`);
-      }
     }
 
     // Parse location into suburb
@@ -108,14 +108,14 @@ async function importCSV() {
       suburb: suburb,
       phone: phone || null,
       email: email || null,
-      website: realWebsite || null,  // ✅ Only real websites go here
-      brabys_url: brabysUrlFinal || null,  // ✅ Brabys URLs go here
+      website: website || null,
+      brabys_url: brabysUrl || null,
       industry_category: industry || null,
       campaign_id: CAMPAIGN_ID,
       created_at: new Date().toISOString()
     };
 
-    // Set website status based on real website
+    // Set website status
     if (leadData.website) {
       leadData.website_status = 'has_website';
     } else {
@@ -143,7 +143,6 @@ async function importCSV() {
   console.log(`✅ Imported: ${imported}`);
   console.log(`❌ Failed: ${failed}`);
   console.log(`🌐 Real websites found: ${websitesFound}`);
-  console.log(`📋 Brabys URLs found: ${brabysUrlsFound}`);
   console.log(`📌 Campaign ID: ${CAMPAIGN_ID}`);
 }
 
